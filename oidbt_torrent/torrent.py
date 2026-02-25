@@ -237,25 +237,25 @@ class Torrent:
         :param tr: Traker
         :param only_one_tr: 只保留一个 traker, 仅在 tr=True 时生效
         """
-        magnet_piece: list[str] = []
+        magnet_pieces: list[str] = []
 
         match self.info.format:
             case self.Torrent_format.v1:
                 assert self.info.hash_v1 is not None
-                magnet_piece.append("xt=urn:btih:" + self.info.hash_v1.hexdigest())
+                magnet_pieces.append("xt=urn:btih:" + self.info.hash_v1.hexdigest())
             case self.Torrent_format.v2:
                 assert self.info.hash_v2 is not None
-                magnet_piece.append("xt=urn:btmh:1220" + self.info.hash_v2.hexdigest())
+                magnet_pieces.append("xt=urn:btmh:1220" + self.info.hash_v2.hexdigest())
             case self.Torrent_format.hybrid:
                 assert self.info.hash_v1 is not None and self.info.hash_v2 is not None
-                magnet_piece.append("xt=urn:btih:" + self.info.hash_v1.hexdigest())
-                magnet_piece.append("xt=urn:btmh:1220" + self.info.hash_v2.hexdigest())
+                magnet_pieces.append("xt=urn:btih:" + self.info.hash_v1.hexdigest())
+                magnet_pieces.append("xt=urn:btmh:1220" + self.info.hash_v2.hexdigest())
 
         if dn:
-            magnet_piece.append("dn=" + urllib.parse.quote(self.data.info.name))
+            magnet_pieces.append("dn=" + urllib.parse.quote(self.data.info.name))
 
         if xl:
-            magnet_piece.append(f"xl={self.get_xl()}")
+            magnet_pieces.append(f"xl={self.get_xl()}")
 
         if ws and self.data.url_list is not None:
             for url in (
@@ -263,7 +263,7 @@ class Torrent:
                 if isinstance(self.data.url_list, list)
                 else [self.data.url_list]
             ):
-                magnet_piece.append("ws=" + urllib.parse.quote(url))
+                magnet_pieces.append("ws=" + urllib.parse.quote(url))
 
         if tr:
             announce_list: list[list[bytes]] = self.data.announce_list or (
@@ -272,6 +272,6 @@ class Torrent:
             if only_one_tr:
                 announce_list = announce_list[:1]
             for url in itertools.chain.from_iterable(announce_list):
-                magnet_piece.append("tr=" + urllib.parse.quote(url))
+                magnet_pieces.append("tr=" + urllib.parse.quote(url))
 
-        return "magnet:?" + "&".join(magnet_piece)
+        return "magnet:?" + "&".join(magnet_pieces)
