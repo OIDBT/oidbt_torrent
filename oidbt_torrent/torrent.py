@@ -37,9 +37,9 @@ class Torrent:
         model_config = ConfigDict(extra="allow", frozen=True)
 
         announce: bytes | None = Field(default=None)
-        announce_list: list[list[bytes]] | None = Field(
+        announce_list: list[list[bytes] | bytes] | None = Field(
             alias="announce-list", default=None
-        )
+        )  # list[bytes] 不是规范格式，仅作兼容
         comment: bytes | None = Field(default=None)
         created_by: bytes | None = Field(alias="created by", default=None)
         creation_date: int | None = Field(alias="creation date", default=None)
@@ -266,12 +266,17 @@ class Torrent:
                 magnet_pieces.append("ws=" + urllib.parse.quote(url))
 
         if tr:
-            announce_list: list[list[bytes]] = self.data.announce_list or (
+            announce_list: list[list[bytes] | bytes] = self.data.announce_list or (
                 [] if self.data.announce is None else [[self.data.announce]]
             )
             if only_one_tr:
                 announce_list = announce_list[:1]
-            for url in itertools.chain.from_iterable(announce_list):
+            for url in itertools.chain.from_iterable(
+                (ann if isinstance(ann, list) else [ann]) for ann in announce_list
+            ):
                 magnet_pieces.append("tr=" + urllib.parse.quote(url))
 
         return "magnet:?" + "&".join(magnet_pieces)
+
+    def encode(self) -> bytes:
+        return bencode(self.data_dict)
