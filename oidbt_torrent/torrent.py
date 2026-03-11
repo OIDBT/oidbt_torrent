@@ -95,16 +95,16 @@ class Torrent:
             case 2:
                 return (
                     self.Torrent_format.v2
-                    if self._data.info.files is None
+                    if self._data.info.files is None and self._data.info.length is None
                     else self.Torrent_format.hybrid
                 )
             case _:
                 raise ValueError("未知的 torrent format")
 
-    def get_hash_v1(self) -> HASH:
+    def get_info_hash_v1(self) -> HASH:
         return hashlib.sha1(bencode(self._data_dict[b"info"]))
 
-    def get_hash_v2(self) -> HASH:
+    def get_info_hash_v2(self) -> HASH:
         return hashlib.sha256(bencode(self._data_dict[b"info"]))
 
     @dataclass(slots=True, kw_only=True)
@@ -119,16 +119,44 @@ class Torrent:
         )
         match _format:
             case self.Torrent_format.v1:
-                self.info.hash_v1 = self.get_hash_v1()
+                self.info.hash_v1 = self.get_info_hash_v1()
             case self.Torrent_format.v2:
-                self.info.hash_v2 = self.get_hash_v2()
+                self.info.hash_v2 = self.get_info_hash_v2()
             case self.Torrent_format.hybrid:
-                self.info.hash_v1 = self.get_hash_v1()
-                self.info.hash_v2 = self.get_hash_v2()
+                self.info.hash_v1 = self.get_info_hash_v1()
+                self.info.hash_v2 = self.get_info_hash_v2()
 
     def _refresh(self) -> None:
         self._refresh_data()
         self._refresh_info()
+
+        def _e() -> Torrent.Parse_error:
+            return self.Parse_error("文件格式错误", self.info, self.data.model_dump())
+
+        if self.data.info.files is not None and self.data.info.length is not None:
+            raise _e()
+        match self.info.format:
+            case self.Torrent_format.v1:
+                if self.data.info.pieces is None or (
+                    self.data.info.files is None and self.data.info.length is None
+                ):
+                    raise _e()
+            case self.Torrent_format.v2:
+                if (
+                    self.data.info.file_tree is None
+                    or self.data.info.meta_version is None
+                    or self.data.piece_layers is None
+                ):
+                    raise _e()
+            case self.Torrent_format.hybrid:
+                if (
+                    self.data.info.pieces is None
+                    or (self.data.info.files is None and self.data.info.length is None)
+                    or self.data.info.file_tree is None
+                    or self.data.info.meta_version is None
+                    or self.data.piece_layers is None
+                ):
+                    raise _e()
 
     @property
     def data_bytes(self) -> bytes:
@@ -158,32 +186,6 @@ class Torrent:
             raise self.Parse_error("第一层有 key 不是 bytes")
 
         self._refresh()
-
-        _e = self.Parse_error("文件格式错误")
-        match self.info.format:
-            case self.Torrent_format.v1:
-                if self.data.info.pieces is None or (
-                    self.data.info.files is None and self.data.info.length is None
-                ):
-                    raise _e
-            case self.Torrent_format.v2:
-                if (
-                    self.data.info.file_tree is None
-                    or self.data.info.meta_version is None
-                    or self.data.piece_layers is None
-                ):
-                    raise _e
-            case self.Torrent_format.hybrid:
-                if (
-                    self.data.info.pieces is None
-                    or (self.data.info.files is None and self.data.info.length is None)
-                    or self.data.info.file_tree is None
-                    or self.data.info.meta_version is None
-                    or self.data.piece_layers is None
-                ):
-                    raise _e
-        if self.data.info.files is not None and self.data.info.length is not None:
-            raise _e
 
     @overload
     def _get_file_tree_xl(self, point: Data.Info.File_tree | Data.Info.File) -> int: ...
